@@ -1,0 +1,338 @@
+---
+title: "Make map"
+author: "DHJ"
+date: "6 12 2019"
+output: html_document
+---
+
+
+```{r}
+
+library("niRvana")
+library(dplyr)
+library(ggplot2)
+
+# NOTE:
+# stations_from_project should add "project name" + coordinates, and remove ENTERED_BY, ENTERED_DATE
+# And perhaps be able to handle >1 project at a time
+
+# Set credentials, get projects
+```
+
+
+## Enter uesename + passwrd for NIVAbase  
+```{r}
+set_credentials()
+
+```
+
+## Data
+
+
+### Get projects
+
+```{r}
+
+df_projects <- get_projects()   # we call it 'df_projects' (the default name used by 'get_stations_from_project')
+
+```
+
+### RID stations   
+
+#### Select RID projects
+```{r}
+sel <- grepl("RID", df_projects$PROJECT_NAME)
+# sum(sel)
+df_projects[sel,]
+
+```
+
+#### Stations
+```{r}
+# Get stations
+df_stations_hoved <- get_stations_from_project("RID- Hovedelver", ignore.case = FALSE)  # PROJECT_ID 3320
+df_stations_bi <- get_stations_from_project("RID - Bielver", ignore.case = FALSE)       # PROJECT_ID 3321
+df_stations <- rbind(df_stations_hoved, df_stations_bi)
+
+# Add info from table STATIONS
+df_stations2 <- get_nivabase_selection("*", "STATIONS", "STATION_ID", df_stations$STATION_ID)
+df_stations <- df_stations %>% 
+  left_join(df_stations2 %>% select(STATION_ID, GEOM_TYPE_ID, GEOM_REF_ID, STATION_TYPE_ID),
+            by = "STATION_ID")
+
+# Get coordinates  
+df_positions <- get_nivabase_selection(
+  "LONGITUDE, LATITUDE, SAMPLE_POINT_ID", 
+  "SAMPLE_POINTS", 
+  "SAMPLE_POINT_ID", df_stations$GEOM_REF_ID, owner = "NIVA_GEOMETRY"
+)
+
+# Add coordinates from table SAMPLE_POINTS
+df_stations <- df_stations %>% 
+  left_join(df_positions, by = c("GEOM_REF_ID" = "SAMPLE_POINT_ID"))
+
+# coor to numeric
+for (col in c("LONGITUDE", "LATITUDE"))
+  df_stations[[col]] <- sub(",", ".", df_stations[[col]]) %>% as.numeric()
+
+df_stations <- df_stations %>%
+  left_join(tibble(PROJECT_ID = c(3320, 3321), RID_type = c("RID hovedelver", "RID bielver")),
+            by = "PROJECT_ID")
+
+```
+
+#### Map
+
+```{r}
+ggplot(df_stations, aes(LONGITUDE, LATITUDE, color = RID_type)) +
+  geom_point()
+
+```
+
+#### Final data
+
+```{r}
+
+RID_stations <- df_stations %>% 
+  select(-c(ENTERED_BY, ENTERED_DATE, GEOM_TYPE_ID, GEOM_REF_ID)) %>%
+  select(RID_type, everything())
+
+```
+
+### ØKOKYST, hydrography only   
+
+#### Data   
+```{r}
+
+okokyst_stations <- readxl::read_excel("K:/Avdeling/214-Oseanografi/DATABASER/OKOKYST_2017/OKOKYST_Hydrografi_Stasjoner_v5.xlsx")
+
+
+df_comb <- bind_rows(RID_stations %>% rename(Stasjon = RID_type),
+                     tibble(Stasjon = "ØKOKYST", 
+                            LONGITUDE = okokyst_stations$Longitude,
+                            LATITUDE = okokyst_stations$Latitude
+                            )
+                     )
+
+```
+
+## Map
+
+```{r}
+ggplot(df_comb, aes(LONGITUDE, LATITUDE, color = Stasjon)) +
+  geom_point()
+
+```
+
+## ØKOKYST from NIVAbasen
+
+```{r}
+
+sel <- grepl("økokyst", df_projects$PROJECT_NAME, ignore.case = TRUE)
+# sum(sel)
+# df_projects[sel,]
+
+# Stations from all recent ØKOKYST projects
+prosj <- c("ØKOKYST Skagerrak 2017-2020",
+           "ØKOKYST Nordsjøen Nord",
+           "ØKOKYST Norskehavet Sør I",
+           "ØKOKYST Norskehavet Sør II",
+           "ØKOKYST Norskehavet Nord I",
+           "ØKOKYST Barentshavet",
+           "ØKOKYST Ferrybox")
+
+# This adds a lot of data frames to the output:
+df_stations <- prosj %>% 
+  purrr::map_df(~get_stations_from_project(., ignore.case = FALSE, exact = TRUE))
+
+# Add 'GEOM_REF_ID' from table STATIONS
+df_stations2 <- get_nivabase_selection("*", "STATIONS", "STATION_ID", df_stations$STATION_ID)
+df_stations <- df_stations %>% 
+  left_join(df_stations2 %>% select(STATION_ID, GEOM_REF_ID),
+            by = "STATION_ID")
+
+# Get coordinates
+df_positions <- get_nivabase_selection(
+  "LONGITUDE, LATITUDE, SAMPLE_POINT_ID", 
+  "SAMPLE_POINTS", 
+  "SAMPLE_POINT_ID", df_stations$GEOM_REF_ID, owner = "NIVA_GEOMETRY"
+)
+
+
+# Add coordinates from table SAMPLE_POINTS
+df_stations <- df_stations %>% 
+  left_join(df_positions, by = c("GEOM_REF_ID" = "SAMPLE_POINT_ID"))
+
+# coor to numeric
+for (col in c("LONGITUDE", "LATITUDE"))
+  df_stations[[col]] <- sub(",", ".", df_stations[[col]]) %>% as.numeric()
+
+# Remove unnecessary columns
+OKOKYST_all_stations <- df_stations %>% 
+  select(-c(ENTERED_BY, ENTERED_DATE)) %>%
+  select(everything())
+
+# Save
+
+if (FALSE) {
+  openxlsx::write.xlsx(OKOKYST_all_stations, "Data/81_OKOKYST_all_stations.xlsx")
+} 
+
+```
+
+### Projects and station codes  
+```{r}
+table(OKOKYST_all_stations$PROJECT_ID)  
+
+# Types of statoins (see below)
+table(substr(OKOKYST_all_stations$STATION_CODE, 1, 2))
+
+# B = bløtbunn, H = hardbunn, V = Hydrografi
+table(substr(OKOKYST_all_stations$STATION_CODE, 1, 1))
+
+```
+
+### Extra data 
+Gotten in mail from Camilla 5.12.2019, see text file in Input_data folder
+
+```{r}
+# Extra data (gotten in mail from Camilla 5.12.2019, see text file in Input_data folder)
+dat_xtra <- readxl::read_excel("Input_data/Stasjoner Norskehavet Nord III.xlsx") %>%
+  rename(STATION_CODE= `Stasjon #`, 
+         STATION_NAME = `Stasjon navn`, 
+         LONGITUDE = Longitude, LATITUDE = Latitude)
+
+# Remove parantheses
+dat_xtra$STATION_CODE <- sub("(", "", dat_xtra$STATION_CODE, fixed = TRUE)
+dat_xtra$STATION_CODE <- sub(")", "", dat_xtra$STATION_CODE, fixed = TRUE)
+
+table(substr(dat_xtra$STATION_CODE, 1, 2))
+
+```
+
+### More extra data 
+Gotten in mail from Camilla 9.12.2019, see text file in Input_data folder
+
+```{r}
+dat_xtra2 <- readxl::read_excel("Input_data/ØKOKYST stasjoner_ tillegg til kart.xlsx") %>%
+  rename(STATION_CODE= `kode`, 
+         STATION_NAME = `stasjonsnavn`, 
+         LONGITUDE = long, LATITUDE = lat) %>%
+  # The ones without parathesis and with 'opsjon' are deleted (they are double up)
+  filter(!(substr(STATION_CODE,1,1) != "(" & `skal_utføres` == "opsjon"))
+
+# Remove parantheses
+dat_xtra2$STATION_CODE <- sub("(", "", dat_xtra2$STATION_CODE, fixed = TRUE)
+dat_xtra2$STATION_CODE <- sub(")", "", dat_xtra2$STATION_CODE, fixed = TRUE)
+
+# dat_xtra2
+
+table(substr(dat_xtra2$STATION_CODE, 1, 2))
+
+
+```
+
+### Add extra data and add 'Stasjon' variable  
+Note: G28 Gullholmen is a hard bottom station - I assume for trends.   
+See "Årsrapport DP Skagerrak 2018.pdf" found in `K:\Prosjekter\Sjøvann\KYSTOVERVÅKING ØKOKYST\KYSTOVERVÅKING ØKOKYST 2017-2020\ØKOKYST DP Skagerrak O-17089_19089\Årsrapport2018\`  
+```{r}
+
+OKOKYST_all_stations2 <- bind_rows(
+  OKOKYST_all_stations,
+  dat_xtra %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
+  dat_xtra2 %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE)
+  ) %>%
+  mutate(Stasjon = case_when(substr(STATION_CODE,1,2) %in% "BT" ~ "Bløtbunn trend",
+                             substr(STATION_CODE,1,2) %in% "BR" ~ "Bløtbunn referanse",
+                             substr(STATION_CODE,1,2) %in% "VT" ~ "Hydrografi trend",
+                             substr(STATION_CODE,1,2) %in% "VR" ~ "Hydrografi referanse",
+                             substr(STATION_CODE,1,2) %in% "HT" ~ "Hardbunn trend",
+                             STATION_CODE %in% "G28" ~ "Hardbunn trend",
+                             substr(STATION_CODE,1,2) %in% c("HR","Hr") ~ "Hardbunn referanse",
+                             substr(STATION_CODE,1,2) %in% "ZT" ~ "Ålegras trend",
+                             substr(STATION_CODE,1,2) %in% "ZR" ~ "Ålegras referanse"
+                             )
+  )
+
+openxlsx::write.xlsx(OKOKYST_all_stations2, "Figures/01_01_Rid_and_Okokyst_coordinates.xlsx")
+
+```
+
+
+
+## Combined ØKOKYST and RID stations 
+
+```{r}
+
+# STATION_NAME first, for hover
+df_comb <- bind_rows(RID_stations %>% 
+                       rename(Stasjon = RID_type) %>%
+                       select(STATION_NAME, Stasjon, STATION_CODE, LONGITUDE, LATITUDE),  
+                     OKOKYST_all_stations2 %>% 
+                       select(STATION_NAME, Stasjon, STATION_CODE, LONGITUDE, LATITUDE)
+)
+
+ggplot(df_comb, aes(LONGITUDE, LATITUDE, color = Stasjon)) +
+  geom_point()
+
+```
+
+### Make interactive map
+
+```{r}
+
+library(nivamaps)
+library(sf)
+library(mapview)
+
+
+make_point <- function(i, data, col_long, col_lat){
+  data[i,c(col_long, col_lat)] %>% 
+    as.numeric() %>%
+    st_point()
+}
+
+point_list <- 1:nrow(df_comb) %>% purrr::map(make_point, data = df_comb, "LONGITUDE", "LATITUDE")
+st_geometry(df_comb) <- st_sfc(point_list, crs = 4326)
+
+# RColorBrewer::display.brewer.all()
+# RColorBrewer::display.brewer.pal(8, "Paired")
+cols <- RColorBrewer::brewer.pal(10, "Paired") %>% rev()
+cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
+
+# Plot below
+mapview(df_comb, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
+
+```
+
+```{r}
+# df_comb_data <- df_comb[c("STATION_CODE", "Stasjon")] %>% as.data.frame()
+
+# Static plots
+mapview(df_comb, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1
+        ) %>%
+  mapshot("Figures/01_Rid_and_Okokyst.html")
+
+# With smaller dots, for showng all or Norway
+mapview(df_comb, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+  mapshot("Figures/01_Rid_and Okokyst_small.html")
+
+# nivamaps  
+# make_map(62, 10, zoom = 6) %>%
+#   add_points(df_sel2[,c(2,1,3)], radius = 5, col_popup = 3) %>% 
+#   make_html(filename = "Figures/Rid_and Okokyst_interactive.html") 
+#rstudioapi::viewer("test.html")
+
+# nivamaps::add_points()
+
+```
+```{r}
+df_comb_data <- df_comb[c("STATION_CODE", "Stasjon")] %>% as.data.frame()
+
+mapview(df_comb, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1
+        )
+
+```
+
