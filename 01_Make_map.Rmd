@@ -172,6 +172,12 @@ OKOKYST_all_stations <- df_stations %>%
   select(-c(ENTERED_BY, ENTERED_DATE)) %>%
   select(everything())
 
+#
+# This one is wrong - correct station added as extra data below (dat_xtra2)
+#
+sel <- OKOKYST_all_stations$STATION_CODE %in% "HT76"; sum(sel)
+OKOKYST_all_stations <- OKOKYST_all_stations[!sel,]
+
 # Save
 
 if (FALSE) {
@@ -259,26 +265,89 @@ openxlsx::write.xlsx(OKOKYST_all_stations2, "Figures/01_01_Rid_and_Okokyst_coord
 ```
 
 
-
-## Combined ØKOKYST and RID stations 
-
+### Sort by position
 ```{r}
 
-# STATION_NAME first, for hover
-df_comb <- bind_rows(RID_stations %>% 
-                       rename(Stasjon = RID_type) %>%
-                       select(STATION_NAME, Stasjon, STATION_CODE, LONGITUDE, LATITUDE),  
-                     OKOKYST_all_stations2 %>% 
-                       select(STATION_NAME, Stasjon, STATION_CODE, LONGITUDE, LATITUDE)
-)
-
-ggplot(df_comb, aes(LONGITUDE, LATITUDE, color = Stasjon)) +
-  geom_point()
+OKOKYST_all_stations2 <- OKOKYST_all_stations2 %>%
+  mutate(LONGITUDE_plot1 = LONGITUDE,
+         LATITUDE_plot1 = LATITUDE,
+         LONGITUDE_plot2 = LONGITUDE,
+         LATITUDE_plot2 = LATITUDE,
+         LONGITUDE_plot3 = LONGITUDE,
+         LATITUDE_plot3 = LATITUDE
+         ) %>%
+  arrange(LATITUDE, LONGITUDE, STATION_CODE)
 
 ```
 
-### Make interactive map
 
+### Remove duplicates  
+```{r}
+d_lat <- diff(OKOKYST_all_stations2$LATITUDE) == 0
+d_lng <- diff(OKOKYST_all_stations2$LONGITUDE) == 0
+d_code <- 
+  head(OKOKYST_all_stations2$STATION_CODE, -1) == tail(OKOKYST_all_stations2$STATION_CODE, -1)
+
+sum(d_lat & d_lng & d_code)
+
+i_remove <- which(d_lat & d_lng & d_code)
+
+# Remove
+OKOKYST_all_stations2 <- OKOKYST_all_stations2[-i_remove,]
+  
+```
+
+
+### Stations with same positions    
+For making 3 versions:
+-	Ver1: Stations with same coordinate moved 500 meter to South/North
+-	Ver2: Stations with same coordinate moved 1000 meter to South/North
+-	Ver3: Stations with same coordinate moved 2000 meter to South/North
+
+
+```{r}
+
+dist_move1 <- 0.5
+dist_move2 <- 1
+dist_move3 <- 0.25
+
+d_lat <- diff(OKOKYST_all_stations2$LATITUDE) == 0
+d_lng <- diff(OKOKYST_all_stations2$LONGITUDE) == 0
+
+sum(d_lat & d_lng)
+
+i1 <- which(d_lat & d_lng)
+i2 <- sort(c(i1, i1+1))
+i2
+
+# Check
+OKOKYST_all_stations2[i2,] %>% 
+     select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE, LATITUDE_plot2)
+
+# Move all B (soft bottom) stations 500 m South, and all V stations 500 m North
+# One latitude = 111.5 km
+OKOKYST_all_stations2$LATITUDE_plot1[i1] <- 
+  OKOKYST_all_stations2$LATITUDE[i1] - 1/111.5*dist_move1
+OKOKYST_all_stations2$LATITUDE_plot1[i1+1] <- 
+  OKOKYST_all_stations2$LATITUDE[i1+1] + 1/111.5*dist_move1
+
+# same but longer
+OKOKYST_all_stations2$LATITUDE_plot2[i1] <- 
+  OKOKYST_all_stations2$LATITUDE[i1] - 1/111.5*dist_move2
+OKOKYST_all_stations2$LATITUDE_plot2[i1+1] <- 
+  OKOKYST_all_stations2$LATITUDE[i1+1] + 1/111.5*dist_move2
+
+# same but longer
+OKOKYST_all_stations2$LATITUDE_plot3[i1] <- 
+  OKOKYST_all_stations2$LATITUDE[i1] - 1/111.5*dist_move3
+OKOKYST_all_stations2$LATITUDE_plot3[i1+1] <- 
+  OKOKYST_all_stations2$LATITUDE[i1+1] + 1/111.5*dist_move3
+
+
+```
+
+
+### Stations with same positions, check
 ```{r}
 
 library(nivamaps)
@@ -292,8 +361,11 @@ make_point <- function(i, data, col_long, col_lat){
     st_point()
 }
 
-point_list <- 1:nrow(df_comb) %>% purrr::map(make_point, data = df_comb, "LONGITUDE", "LATITUDE")
-st_geometry(df_comb) <- st_sfc(point_list, crs = 4326)
+df_test <- OKOKYST_all_stations2[i2,]
+
+point_list <- 1:nrow(df_test) %>% 
+  purrr::map(make_point, data = df_test, "LONGITUDE_plot2", "LATITUDE_plot2")
+st_geometry(df_test) <- st_sfc(point_list, crs = 4326)
 
 # RColorBrewer::display.brewer.all()
 # RColorBrewer::display.brewer.pal(8, "Paired")
@@ -301,22 +373,131 @@ cols <- RColorBrewer::brewer.pal(10, "Paired") %>% rev()
 cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
 
 # Plot below
-mapview(df_comb, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
+mapview(df_test, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
 
 ```
+
+
+
+## Combined ØKOKYST and RID stations   
+
+Makes three sets of coordinates, as there willl be made three sets of maps depending on how far same-coordinate stations are moved.
+
+```{r}
+
+# STATION_NAME first, for hover
+df_comb <- bind_rows(RID_stations %>% 
+                       rename(Stasjon = RID_type) %>%
+                       mutate(LONGITUDE_plot1 = LONGITUDE,
+                              LATITUDE_plot1 = LATITUDE,
+                              LONGITUDE_plot2 = LONGITUDE,
+                              LATITUDE_plot2 = LATITUDE,
+                              LONGITUDE_plot3 = LONGITUDE,
+                              LATITUDE_plot3 = LATITUDE
+                       ) %>%                       
+                       select(STATION_NAME, Stasjon, STATION_CODE, 
+                              LONGITUDE, LATITUDE,
+                              LONGITUDE_plot1, LATITUDE_plot1,
+                              LONGITUDE_plot2, LATITUDE_plot2,
+                              LONGITUDE_plot3, LATITUDE_plot3
+                              ),  
+                     OKOKYST_all_stations2 %>% 
+                       select(STATION_NAME, Stasjon, STATION_CODE, 
+                              LONGITUDE, LATITUDE,
+                              LONGITUDE_plot1, LATITUDE_plot1,
+                              LONGITUDE_plot2, LATITUDE_plot2,
+                              LONGITUDE_plot3, LATITUDE_plot3
+                              )
+)
+
+ggplot(df_comb, aes(LONGITUDE_plot1, LATITUDE_plot1, color = Stasjon)) +
+  geom_point()
+
+```
+
+### Make interactive maps
+
+Makes three sets of data (for the three versions of maps).
+
+```{r}
+
+library(nivamaps)
+library(sf)
+library(mapview)
+
+df_comb1 <- df_comb
+df_comb2 <- df_comb
+df_comb3 <- df_comb
+
+make_point <- function(i, data, col_long, col_lat){
+  data[i,c(col_long, col_lat)] %>% 
+    as.numeric() %>%
+    st_point()
+}
+
+point_list <- 1:nrow(df_comb) %>% 
+  purrr::map(make_point, data = df_comb, "LONGITUDE_plot1", "LATITUDE_plot1")
+st_geometry(df_comb1) <- st_sfc(point_list, crs = 4326)
+
+point_list <- 1:nrow(df_comb) %>% 
+  purrr::map(make_point, data = df_comb, "LONGITUDE_plot2", "LATITUDE_plot2")
+st_geometry(df_comb2) <- st_sfc(point_list, crs = 4326)
+
+point_list <- 1:nrow(df_comb) %>% 
+  purrr::map(make_point, data = df_comb, "LONGITUDE_plot3", "LATITUDE_plot3")
+st_geometry(df_comb3) <- st_sfc(point_list, crs = 4326)
+
+
+# RColorBrewer::display.brewer.all()
+# RColorBrewer::display.brewer.pal(8, "Paired")
+cols <- RColorBrewer::brewer.pal(10, "Paired") %>% rev()
+cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
+
+# Plot below
+mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
+
+```
+
+### Save interactive maps  
+6 versions:  
+3 versions (depending of movement of same-coordinate stations) * 2 point-size verions
 
 ```{r}
 # df_comb_data <- df_comb[c("STATION_CODE", "Stasjon")] %>% as.data.frame()
 
+
 # Static plots
-mapview(df_comb, zcol = "Stasjon", 
+mapview(df_comb1, zcol = "Stasjon", 
         col.regions = cols, alpha.regions = 1
         ) %>%
-  mapshot("Figures/01_Rid_and_Okokyst.html")
+  mapshot("Figures/01_Rid_and_Okokyst_ver1.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
-  mapshot("Figures/01_Rid_and Okokyst_small.html")
+mapview(df_comb1, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+  mapshot("Figures/01_Rid_and Okokyst_small_ver1.html")
+
+
+# Static plots
+mapview(df_comb2, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1
+        ) %>%
+  mapshot("Figures/01_Rid_and_Okokyst_ver2.html")
+
+# With smaller dots, for showng all or Norway
+mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+  mapshot("Figures/01_Rid_and Okokyst_small_ver2.html")
+
+
+# Static plots
+mapview(df_comb3, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1
+        ) %>%
+  mapshot("Figures/01_Rid_and_Okokyst_ver3.html")
+
+# With smaller dots, for showng all or Norway
+mapview(df_comb3, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+  mapshot("Figures/01_Rid_and Okokyst_small_ver3.html")
+
 
 # nivamaps  
 # make_map(62, 10, zoom = 6) %>%
@@ -327,12 +508,6 @@ mapview(df_comb, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 
 # nivamaps::add_points()
 
 ```
-```{r}
-df_comb_data <- df_comb[c("STATION_CODE", "Stasjon")] %>% as.data.frame()
 
-mapview(df_comb, zcol = "Stasjon", 
-        col.regions = cols, alpha.regions = 1
-        )
 
-```
 
