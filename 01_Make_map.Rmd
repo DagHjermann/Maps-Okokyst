@@ -20,7 +20,7 @@ library(ggplot2)
 ```
 
 
-## Enter uesename + passwrd for NIVAbase  
+## Enter username + passwrd for NIVAbase  
 ```{r}
 
 set_credentials()
@@ -253,7 +253,25 @@ dat_xtra3 <- tibble(
 
 ```
 
-### Add the 3 sets of extra data and add 'Stasjon' variable  
+### Even more extra data, again 
+Gotten in mail from Camilla 11.12.2019
+
+```{r}
+
+st <- c("HR19","HR121","HR153","HT28","HT27","HT33","HT34")
+
+dat_xtra4 <- readxl::read_excel(
+  "Input_data/Økokyststasjoner_tilbud2016_alle.xlsx",
+  sheet = "hardbunn") %>%
+  rename(STATION_CODE = `St.nr`, 
+         STATION_NAME = `St.navn`, 
+         LONGITUDE = X__1, LATITUDE = Posisjon) %>%
+  filter(STATION_CODE %in% st) %>%
+  select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE)
+
+```
+
+### Add the 4 sets of extra data and add 'Stasjon' variable  
 Note: G28 Gullholmen is a hard bottom station - I assume for trends.   
 See "Årsrapport DP Skagerrak 2018.pdf" found in `K:\Prosjekter\Sjøvann\KYSTOVERVÅKING ØKOKYST\KYSTOVERVÅKING ØKOKYST 2017-2020\ØKOKYST DP Skagerrak O-17089_19089\Årsrapport2018\`  
 ```{r}
@@ -262,7 +280,8 @@ OKOKYST_all_stations2 <- bind_rows(
   OKOKYST_all_stations,
   dat_xtra %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
   dat_xtra2 %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
-  dat_xtra3
+  dat_xtra3,
+  dat_xtra4
   ) %>%
   mutate(Stasjon = case_when(substr(STATION_CODE,1,2) %in% "BT" ~ "Bløtbunn trend",
                              substr(STATION_CODE,1,2) %in% "BR" ~ "Bløtbunn referanse",
