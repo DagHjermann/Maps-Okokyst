@@ -469,8 +469,16 @@ st_geometry(df_comb3) <- st_sfc(point_list, crs = 4326)
 cols <- RColorBrewer::brewer.pal(10, "Paired") %>% rev()
 cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
 
+#
+# Labels for mouseover
+#
+label_1 <- with(df_comb1, paste0(STATION_CODE, " (", STATION_NAME, ")"))
+label_2 <- with(df_comb2, paste0(STATION_CODE, " (", STATION_NAME, ")"))
+label_3 <- with(df_comb3, paste0(STATION_CODE, " (", STATION_NAME, ")"))
+
 # Plot below
-mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
+mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1,
+        label = label_2)
 
 ```
 
@@ -484,34 +492,43 @@ mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1)
 
 # Static plots
 mapview(df_comb1, zcol = "Stasjon", 
-        col.regions = cols, alpha.regions = 1
+        col.regions = cols, alpha.regions = 1,
+        label = label_1
         ) %>%
   mapshot("Figures/01_Rid_and_Okokyst_ver1.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb1, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+mapview(df_comb1, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1, 
+        label = label_1, cex = 3) %>%
   mapshot("Figures/01_Rid_and Okokyst_small_ver1.html")
 
 
 # Static plots
 mapview(df_comb2, zcol = "Stasjon", 
-        col.regions = cols, alpha.regions = 1
+        col.regions = cols, alpha.regions = 1,
+        label = label_2
         ) %>%
   mapshot("Figures/01_Rid_and_Okokyst_ver2.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+mapview(df_comb2, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1, 
+        label = label_2, cex = 3) %>%
   mapshot("Figures/01_Rid_and Okokyst_small_ver2.html")
 
 
 # Static plots
 mapview(df_comb3, zcol = "Stasjon", 
-        col.regions = cols, alpha.regions = 1
+        col.regions = cols, alpha.regions = 1,
+        label = label_3
         ) %>%
   mapshot("Figures/01_Rid_and_Okokyst_ver3.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb3, zcol = "Stasjon", col.regions = cols, alpha.regions = 1, cex = 3) %>%
+mapview(df_comb3, zcol = "Stasjon", 
+        col.regions = cols, alpha.regions = 1, 
+        label = label_3, cex = 3) %>%
   mapshot("Figures/01_Rid_and Okokyst_small_ver3.html")
 
 
