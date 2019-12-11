@@ -22,6 +22,7 @@ library(ggplot2)
 
 ## Enter uesename + passwrd for NIVAbase  
 ```{r}
+
 set_credentials()
 
 ```
@@ -238,7 +239,21 @@ table(substr(dat_xtra2$STATION_CODE, 1, 2))
 
 ```
 
-### Add extra data and add 'Stasjon' variable  
+### Even more extra data 
+Gotten in mail from Camilla 11.12.2019
+
+```{r}
+
+dat_xtra3 <- tibble(
+  STATION_CODE = c("HT77", "HT78"), 
+  STATION_NAME = c("Hemreviken", "Fuglbergøya"),
+  LONGITUDE = c(14.83210, 14.68820), 
+  LATITUDE = c(68.21070, 68.15380))
+
+
+```
+
+### Add the 3 sets of extra data and add 'Stasjon' variable  
 Note: G28 Gullholmen is a hard bottom station - I assume for trends.   
 See "Årsrapport DP Skagerrak 2018.pdf" found in `K:\Prosjekter\Sjøvann\KYSTOVERVÅKING ØKOKYST\KYSTOVERVÅKING ØKOKYST 2017-2020\ØKOKYST DP Skagerrak O-17089_19089\Årsrapport2018\`  
 ```{r}
@@ -246,7 +261,8 @@ See "Årsrapport DP Skagerrak 2018.pdf" found in `K:\Prosjekter\Sjøvann\KYSTOVE
 OKOKYST_all_stations2 <- bind_rows(
   OKOKYST_all_stations,
   dat_xtra %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
-  dat_xtra2 %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE)
+  dat_xtra2 %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
+  dat_xtra3
   ) %>%
   mutate(Stasjon = case_when(substr(STATION_CODE,1,2) %in% "BT" ~ "Bløtbunn trend",
                              substr(STATION_CODE,1,2) %in% "BR" ~ "Bløtbunn referanse",
