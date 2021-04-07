@@ -1,0 +1,59 @@
+
+
+From: Camilla With Fagerli <camilla.with.fagerli@niva.no> 
+Sent: torsdag 5. desember 2019 11:02
+To: Dag Øystein Hjermann <Dag.Hjermann@niva.no>; Mats Gunnar Walday <mats.walday@niva.no>
+Cc: John Rune Selvik <John.Selvik@niva.no>
+Subject: RE: Økokystkart
+
+Hei,
+Her er metadata for stasjonene som inngår I DP Norskehavet Nord III. Stasjonsnumre i parentes betyr at stasjonen er opsjon.   
+Hilsen Camilla
+
+From: Dag Øystein Hjermann <Dag.Hjermann@niva.no> 
+Sent: torsdag 5. desember 2019 10.46
+To: Mats Gunnar Walday <mats.walday@niva.no>
+Cc: John Rune Selvik <John.Selvik@niva.no>; Camilla With Fagerli <camilla.with.fagerli@niva.no>
+Subject: RE: Økokystkart
+
+OK! 
+
+Dag
+
+From: Mats Gunnar Walday <mats.walday@niva.no> 
+Sent: torsdag 5. desember 2019 10:34
+To: Dag Øystein Hjermann <Dag.Hjermann@niva.no>
+Cc: John Rune Selvik <John.Selvik@niva.no>; Camilla With Fagerli <camilla.with.fagerli@niva.no>
+Subject: RE: Økokystkart
+
+Hei
+Det er kart for trykk, hvor man kan klippe ut og presentere hvert overvåkingsområde for seg. Camilla skal sende meg posisjoner og metainfo for de nye stasjonene.
+Vh. Mats
+
+From: Dag Øystein Hjermann <Dag.Hjermann@niva.no> 
+Sent: torsdag 5. desember 2019 10:20
+To: John Rune Selvik <John.Selvik@niva.no>; Mats Gunnar Walday <mats.walday@niva.no>
+Subject: RE: Økokystkart
+
+Hei! 
+
+Skal være kjapt å oppdatere. Er det et slikt interaktivt kart som ønskes (som lenke under), eller kart for trykk?
+
+Desimalgrader er greiest. Men det er ikke så mange minutter ekstra for å konvertere grader/minutter eller UTM.
+
+Dag
+
+From: John Rune Selvik <John.Selvik@niva.no> 
+Sent: torsdag 5. desember 2019 10:08
+To: Mats Gunnar Walday <mats.walday@niva.no>; Dag Øystein Hjermann <Dag.Hjermann@niva.no>
+Subject: Økokystkart
+
+Mats: Hvis Dags kart skal suppleres med nye stasjoner fra Finnmark, så må vel noen komme opp med en liste over de nye stasjonene inkl. litt metainfo om «type stasjon».
+
+\\niva-of5\osl-data-niva\Avdeling\214-Oseanografi\DHJ\Data\Maps\81_Rid_Okokyst.html
+
+Jeg har snakket med Dag og det bør være overkommelig å oppdatere kartet hvis stasjonene foreligger i en tabell.
+
+Dag: Hva slags koordinater vil du ha? Desimalgrader?
+
+Hilsen John Rune
