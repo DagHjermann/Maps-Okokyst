@@ -20,10 +20,12 @@ library(ggplot2)
 ```
 
 
-## Enter username + passwrd for NIVAbase  
+## Set username + password for NIVAbase
+
+Not needed if you have saved username + password for NIVAbase permanently using keyring.  
 ```{r}
 
-set_credentials()
+# set_credentials()
 
 ```
 
