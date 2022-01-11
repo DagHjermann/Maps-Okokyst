@@ -5,6 +5,9 @@ date: "6 12 2019"
 output: html_document
 ---
 
+Making interactive map (using mapview) of marine stations (Økokyst and ocean acidification) as well as river/freshwater stations (RID and reference rivers)
+
+## Packages
 
 ```{r}
 
@@ -19,30 +22,21 @@ library(ggplot2)
 # Set credentials, get projects
 ```
 
+## Get projects
+
+```{r}
 
 ## Set username + password for NIVAbase
-
-Not needed if you have saved username + password for NIVAbase permanently using keyring.  
-```{r}
-
+# (Not needed if you have saved username + password for NIVAbase permanently using keyring )
 # set_credentials()
-
-```
-
-## Data
-
-
-### Get projects
-
-```{r}
 
 df_projects <- get_projects()   # we call it 'df_projects' (the default name used by 'get_stations_from_project')
 
 ```
 
-### RID stations   
+## RID stations   
 
-#### Select RID projects
+### Select RID projects
 ```{r}
 sel <- grepl("RID", df_projects$PROJECT_NAME)
 # sum(sel)
@@ -50,80 +44,47 @@ df_projects[sel,]
 
 ```
 
-#### Stations
+### Stations
 ```{r}
+
 # Get stations
+# debugonce(get_stations_from_project)
 df_stations_hoved <- get_stations_from_project("RID- Hovedelver", ignore.case = FALSE)  # PROJECT_ID 3320
 df_stations_bi <- get_stations_from_project("RID - Bielver", ignore.case = FALSE)       # PROJECT_ID 3321
-df_stations <- rbind(df_stations_hoved, df_stations_bi)
 
-# Add info from table STATIONS
-df_stations2 <- get_nivabase_selection("*", "STATIONS", "STATION_ID", df_stations$STATION_ID)
-df_stations <- df_stations %>% 
-  left_join(df_stations2 %>% select(STATION_ID, GEOM_TYPE_ID, GEOM_REF_ID, STATION_TYPE_ID),
-            by = "STATION_ID")
-
-# Get coordinates  
-df_positions <- get_nivabase_selection(
-  "LONGITUDE, LATITUDE, SAMPLE_POINT_ID", 
-  "SAMPLE_POINTS", 
-  "SAMPLE_POINT_ID", df_stations$GEOM_REF_ID, owner = "NIVA_GEOMETRY"
-)
-
-# Add coordinates from table SAMPLE_POINTS
-df_stations <- df_stations %>% 
-  left_join(df_positions, by = c("GEOM_REF_ID" = "SAMPLE_POINT_ID"))
-
-# coor to numeric
-for (col in c("LONGITUDE", "LATITUDE"))
-  df_stations[[col]] <- sub(",", ".", df_stations[[col]]) %>% as.numeric()
-
-df_stations <- df_stations %>%
-  left_join(tibble(PROJECT_ID = c(3320, 3321), RID_type = c("RID hovedelver", "RID bielver")),
-            by = "PROJECT_ID")
-
-```
-
-#### Map
-
-```{r}
-ggplot(df_stations, aes(LONGITUDE, LATITUDE, color = RID_type)) +
-  geom_point()
-
-```
-
-#### Final data
-
-```{r}
-
-RID_stations <- df_stations %>% 
-  select(-c(ENTERED_BY, ENTERED_DATE, GEOM_TYPE_ID, GEOM_REF_ID)) %>%
+# Combine and add coordinates
+RID_stations <- rbind(df_stations_hoved, df_stations_bi) %>%
+  add_coordinates() %>%
+  left_join(tibble(PROJECT_ID = c(3320, 3321), 
+                   RID_type = c("RID hovedelver", "RID bielver")),
+            by = "PROJECT_ID") %>%
   select(RID_type, everything())
 
 ```
 
-### ØKOKYST, hydrography only   
 
-#### Data   
+
+### Data on map  
+
 ```{r}
 
-okokyst_stations <- readxl::read_excel("K:/Avdeling/214-Oseanografi/DATABASER/OKOKYST_2017/OKOKYST_Hydrografi_Stasjoner_v5.xlsx")
-
-
-df_comb <- bind_rows(RID_stations %>% rename(Stasjon = RID_type),
-                     tibble(Stasjon = "ØKOKYST", 
-                            LONGITUDE = okokyst_stations$Longitude,
-                            LATITUDE = okokyst_stations$Latitude
-                            )
-                     )
+ggplot(RID_stations, aes(LONGITUDE, LATITUDE, color = RID_type)) +
+  geom_point()
 
 ```
 
-## Map
+
+
+
+
+## ØKOKYST, hydrography only    
+
+* Not used, kept only for hiostorical reasons  
 
 ```{r}
-ggplot(df_comb, aes(LONGITUDE, LATITUDE, color = Stasjon)) +
-  geom_point()
+
+okokyst_stations <- readxl::read_excel(
+  "K:/Avdeling/214-Oseanografi/DATABASER/OKOKYST_2017/OKOKYST_Hydrografi_Stasjoner_v5.xlsx")
 
 ```
 
@@ -148,32 +109,8 @@ prosj <- c("ØKOKYST Skagerrak 2017-2020",
 df_stations <- prosj %>% 
   purrr::map_df(~get_stations_from_project(., ignore.case = FALSE, exact = TRUE))
 
-# Add 'GEOM_REF_ID' from table STATIONS
-df_stations2 <- get_nivabase_selection("*", "STATIONS", "STATION_ID", df_stations$STATION_ID)
-df_stations <- df_stations %>% 
-  left_join(df_stations2 %>% select(STATION_ID, GEOM_REF_ID),
-            by = "STATION_ID")
-
-# Get coordinates
-df_positions <- get_nivabase_selection(
-  "LONGITUDE, LATITUDE, SAMPLE_POINT_ID", 
-  "SAMPLE_POINTS", 
-  "SAMPLE_POINT_ID", df_stations$GEOM_REF_ID, owner = "NIVA_GEOMETRY"
-)
-
-
-# Add coordinates from table SAMPLE_POINTS
-df_stations <- df_stations %>% 
-  left_join(df_positions, by = c("GEOM_REF_ID" = "SAMPLE_POINT_ID"))
-
-# coor to numeric
-for (col in c("LONGITUDE", "LATITUDE"))
-  df_stations[[col]] <- sub(",", ".", df_stations[[col]]) %>% as.numeric()
-
-# Remove unnecessary columns
 OKOKYST_all_stations <- df_stations %>% 
-  select(-c(ENTERED_BY, ENTERED_DATE)) %>%
-  select(everything())
+  add_coordinates()
 
 #
 # This one is wrong - correct station added as extra data below (dat_xtra2)
@@ -201,21 +138,21 @@ table(substr(OKOKYST_all_stations$STATION_CODE, 1, 1))
 
 ```
 
-### Extra data 
+### Extra data 1
 Gotten in mail from Camilla 5.12.2019, see text file in Input_data folder
 
 ```{r}
 # Extra data (gotten in mail from Camilla 5.12.2019, see text file in Input_data folder)
-dat_xtra <- readxl::read_excel("Input_data/Stasjoner Norskehavet Nord III.xlsx") %>%
+dat_xtra1 <- readxl::read_excel("Input_data/Stasjoner Norskehavet Nord III.xlsx") %>%
   rename(STATION_CODE= `Stasjon #`, 
          STATION_NAME = `Stasjon navn`, 
          LONGITUDE = Longitude, LATITUDE = Latitude)
 
 # Remove parantheses
-dat_xtra$STATION_CODE <- sub("(", "", dat_xtra$STATION_CODE, fixed = TRUE)
-dat_xtra$STATION_CODE <- sub(")", "", dat_xtra$STATION_CODE, fixed = TRUE)
+dat_xtra1$STATION_CODE <- sub("(", "", dat_xtra1$STATION_CODE, fixed = TRUE)
+dat_xtra1$STATION_CODE <- sub(")", "", dat_xtra1$STATION_CODE, fixed = TRUE)
 
-table(substr(dat_xtra$STATION_CODE, 1, 2))
+table(substr(dat_xtra1$STATION_CODE, 1, 2))
 
 ```
 
@@ -264,10 +201,10 @@ st <- c("HR19","HR121","HR153","HT28","HT27","HT33","HT34")
 
 dat_xtra4 <- readxl::read_excel(
   "Input_data/Økokyststasjoner_tilbud2016_alle.xlsx",
-  sheet = "hardbunn") %>%
+  sheet = "hardbunn") %>% # names()
   rename(STATION_CODE = `St.nr`, 
          STATION_NAME = `St.navn`, 
-         LONGITUDE = X__1, LATITUDE = Posisjon) %>%
+         LONGITUDE = `...6`, LATITUDE = Posisjon) %>%
   filter(STATION_CODE %in% st) %>%
   select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE)
 
@@ -280,7 +217,7 @@ See "Årsrapport DP Skagerrak 2018.pdf" found in `K:\Prosjekter\Sjøvann\KYSTOVE
 
 OKOKYST_all_stations2 <- bind_rows(
   OKOKYST_all_stations,
-  dat_xtra %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
+  dat_xtra1 %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
   dat_xtra2 %>% select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE),
   dat_xtra3,
   dat_xtra4
@@ -358,8 +295,8 @@ i2 <- sort(c(i1, i1+1))
 i2
 
 # Check
-OKOKYST_all_stations2[i2,] %>% 
-     select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE, LATITUDE_plot2)
+# OKOKYST_all_stations2[i2,] %>% 
+#      select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE, LATITUDE_plot2)
 
 # Move all B (soft bottom) stations 500 m South, and all V stations 500 m North
 # One latitude = 111.5 km
@@ -373,6 +310,10 @@ OKOKYST_all_stations2$LATITUDE_plot2[i1] <-
   OKOKYST_all_stations2$LATITUDE[i1] - 1/111.5*dist_move2
 OKOKYST_all_stations2$LATITUDE_plot2[i1+1] <- 
   OKOKYST_all_stations2$LATITUDE[i1+1] + 1/111.5*dist_move2
+
+# Demonstrate (shown below)
+OKOKYST_all_stations2[i2,] %>% 
+     select(STATION_NAME, STATION_CODE, LONGITUDE, LATITUDE, LATITUDE_plot2)
 
 # same but longer
 OKOKYST_all_stations2$LATITUDE_plot3[i1] <- 
@@ -390,7 +331,6 @@ OKOKYST_all_stations2$LATITUDE_plot3[i1+1] <-
 library(nivamaps)
 library(sf)
 library(mapview)
-
 
 make_point <- function(i, data, col_long, col_lat){
   data[i,c(col_long, col_lat)] %>% 
@@ -410,15 +350,16 @@ cols <- RColorBrewer::brewer.pal(10, "Paired") %>% rev()
 cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
 
 # Plot below
-mapview(df_test, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
+# mapview(df_test, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
 
 ```
 
 
 
+
 ## Combined ØKOKYST and RID stations   
 
-Makes three sets of coordinates, as there willl be made three sets of maps depending on how far same-coordinate stations are moved.
+Makes three sets of coordinates, as there will be made three sets of maps depending on how far same-coordinate stations are moved.
 
 ```{r}
 
