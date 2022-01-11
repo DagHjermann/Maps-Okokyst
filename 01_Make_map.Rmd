@@ -355,7 +355,48 @@ cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
 ```
 
 
+## Ocean acidification (havforsuring)  
 
+```{r}
+
+# STATION_NAME, Stasjon (= type stasjon), STATION_CODE, LONGITUDE, LATITUDE
+
+oa_stations1 <- readxl::read_excel(
+  "Input_data/Havforsuring 210044 Overview_saved4Jan2022.xlsx", 
+  sheet = "Sampling overview", skip = 1
+  ) %>%
+  rename(
+    Stasjon_orig = Stasjon,
+    LATITUDE = `Latitude (decimal)`,
+    LONGITUDE = `Longitude (decimal)`)
+
+oa_stations2 <- oa_stations1 %>%
+  filter(!is.na(LATITUDE)) %>%
+  mutate(
+    Stasjon = case_when(
+      grepl("Kiel", Stasjon_orig) ~ "OA Ferrybox",
+      grepl("Tromsø", Stasjon_orig) ~ "OA Ferrybox",
+      grepl("VT", Stasjon_orig) ~ "OA Økokyst",
+      grepl("VR", Stasjon_orig) ~ "OA Økokyst",
+      `Instipro activity` %in% "KYST" ~ "OA Kyst",
+      TRUE ~ "OA Kyst")
+  )
+
+# oa_stations2 %>% select(Type:`Instipro activity`, Stasjon) %>% View()
+
+
+
+```
+
+
+### Data on map  
+
+```{r}
+
+ggplot(oa_stations2, aes(LONGITUDE, LATITUDE, color = Stasjon)) +
+  geom_point()
+
+```
 
 ## Combined ØKOKYST and RID stations   
 
