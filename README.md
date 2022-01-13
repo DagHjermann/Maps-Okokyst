@@ -2,7 +2,7 @@
 
 Interactive maps of marine stations (Økokyst and ocean acidification) as well as river/freshwater stations (RID and reference rivers)  
 
-Main script: 
+Main script: 01_Make_map.md (markdown result) and 01_Make_map.Rmd (script)  
 
 All stations in one group - cannot turn off just one kind of stations in map:
 (same map, different sizes of dots)   
