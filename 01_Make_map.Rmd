@@ -2,14 +2,20 @@
 title: "Make map"
 author: "DHJ"
 date: "6 12 2019"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    keep_md: true
 ---
 
-Making interactive map (using mapview) of marine stations (Økokyst and ocean acidification) as well as river/freshwater stations (RID and reference rivers)
+Making interactive maps (using mapview) of marine stations (Økokyst and ocean acidification) as well as river/freshwater stations (RID and reference rivers)  
+
+* Several result
 
 ## Packages
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 
 library("niRvana")
 library(dplyr)
@@ -114,11 +120,11 @@ df_stations <- prosj %>%
 OKOKYST_all_stations <- df_stations %>% 
   add_coordinates()
 
-#
-# This one is wrong - correct station added as extra data below (dat_xtra2)
-#
-sel <- OKOKYST_all_stations$STATION_CODE %in% "HT76"; sum(sel)
+cat("\n")
+cat("One station is wrong - remove it here; correct station added as extra data below (dat_xtra2)\n")
+sel <- OKOKYST_all_stations$STATION_CODE %in% "HT76"
 OKOKYST_all_stations <- OKOKYST_all_stations[!sel,]
+cat(sum(sel), "station removed\n")
 
 # Save
 
@@ -567,17 +573,6 @@ label_3 <- with(df_comb3, paste0(STATION_CODE, " (", STATION_NAME, ")"))
 
 ## Interactive maps 1
 
-### Interactive plot (variant 2)  
-
-```{r}
-
-# Plot below
-mapview(df_comb2, zcol = "Stasjonstype", col.regions = cols, alpha.regions = 1,
-        label = label_2)
-
-
-```
-
 ### Save interactive maps  
 6 versions:  
   - 3 versions (depending of movement of same-coordinate stations) * 2 point-size verions
@@ -639,9 +634,14 @@ mapview(df_comb3, zcol = "Stasjonstype",
 ```
 
 ## Interactive maps 2 (ver 4)   
-- HTML files version 4a and 4b  
 
-### Separate data for each station type     
+- HTML files version 4a and 4b  
+- Can turn on and off each group/type of points separately  
+- Økokyst stations are split in different groups (Type)   
+
+
+### Separate data for each station type       
+
 ```{r}
 
 #
@@ -799,15 +799,22 @@ final_map_ver4b %>% mapshot(paste0("K:/Avdeling/214-Oseanografi/DHJ/Data/Maps/Ø
 
 ```
 
+### Show map  
+```{r, fig.width=8, fig.height=8}
+
+final_map_ver4b
+
+```
+
 
 ## Interactive maps 3 (ver 5)   
 
 - HTML files version 5a and 5b  
-- Økokyst in a single group (Type)   
-- NOTE: mouseover text doesn't fit with station (although variable "Label" is correct.) 
+- Can turn on and off each group/type of points separately (as ver 4)  
+- All Økokyst stations are put in a single group (different from ver 4)   
+  
+### Separate data for each station type       
 
-### Separate data    
-- 
 ```{r}
 
 #
