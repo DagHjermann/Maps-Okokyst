@@ -13,6 +13,8 @@ Making interactive map (using mapview) of marine stations (Økokyst and ocean ac
 
 library("niRvana")
 library(dplyr)
+library(purrr)
+library(stringr)
 library(ggplot2)
 
 # NOTE:
@@ -210,7 +212,7 @@ dat_xtra4 <- readxl::read_excel(
 
 ```
 
-### Add the 4 sets of extra data and add 'Stasjon' variable  
+### Add the 4 sets of extra data and add 'Stasjonstype' variable  
 Note: G28 Gullholmen is a hard bottom station - I assume for trends.   
 See "Årsrapport DP Skagerrak 2018.pdf" found in `K:\Prosjekter\Sjøvann\KYSTOVERVÅKING ØKOKYST\KYSTOVERVÅKING ØKOKYST 2017-2020\ØKOKYST DP Skagerrak O-17089_19089\Årsrapport2018\`  
 ```{r}
@@ -222,7 +224,7 @@ OKOKYST_all_stations2 <- bind_rows(
   dat_xtra3,
   dat_xtra4
   ) %>%
-  mutate(Stasjon = case_when(substr(STATION_CODE,1,2) %in% "BT" ~ "Bløtbunn trend",
+  mutate(Stasjonstype = case_when(substr(STATION_CODE,1,2) %in% "BT" ~ "Bløtbunn trend",
                              substr(STATION_CODE,1,2) %in% "BR" ~ "Bløtbunn referanse",
                              substr(STATION_CODE,1,2) %in% "VT" ~ "Hydrografi trend",
                              substr(STATION_CODE,1,2) %in% "VR" ~ "Hydrografi referanse",
@@ -234,7 +236,8 @@ OKOKYST_all_stations2 <- bind_rows(
                              )
   )
 
-openxlsx::write.xlsx(OKOKYST_all_stations2, "Figures/01_01_Rid_and_Okokyst_coordinates.xlsx")
+if (FALSE)
+  openxlsx::write.xlsx(OKOKYST_all_stations2, "Figures/01_01_Rid_and_Okokyst_coordinates.xlsx")
 
 ```
 
@@ -350,7 +353,16 @@ cols <- RColorBrewer::brewer.pal(10, "Paired") %>% rev()
 cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
 
 # Plot below
-# mapview(df_test, zcol = "Stasjon", col.regions = cols, alpha.regions = 1) 
+# mapview(df_test, zcol = "Stasjonstype", col.regions = cols, alpha.regions = 1) 
+
+```
+
+### Data on map  
+
+```{r}
+
+ggplot(OKOKYST_all_stations2, aes(LONGITUDE, LATITUDE, color = Stasjonstype)) +
+  geom_point()
 
 ```
 
@@ -359,30 +371,33 @@ cols <- cols[c(2,1,4,3,6,5,8,7,10,9)]
 
 ```{r}
 
-# STATION_NAME, Stasjon (= type stasjon), STATION_CODE, LONGITUDE, LATITUDE
+# STATION_NAME, Stasjonstype (= type stasjon), STATION_CODE, LONGITUDE, LATITUDE
 
 oa_stations1 <- readxl::read_excel(
   "Input_data/Havforsuring 210044 Overview_saved4Jan2022.xlsx", 
   sheet = "Sampling overview", skip = 1
   ) %>%
   rename(
-    Stasjon_orig = Stasjon,
+    STATION_NAME = Stasjon,
+    STATION_CODE = `Stasjon nr.`,
     LATITUDE = `Latitude (decimal)`,
     LONGITUDE = `Longitude (decimal)`)
 
-oa_stations2 <- oa_stations1 %>%
+oa_stations <- oa_stations1 %>%
   filter(!is.na(LATITUDE)) %>%
   mutate(
-    Stasjon = case_when(
-      grepl("Kiel", Stasjon_orig) ~ "OA Ferrybox",
-      grepl("Tromsø", Stasjon_orig) ~ "OA Ferrybox",
-      grepl("VT", Stasjon_orig) ~ "OA Økokyst",
-      grepl("VR", Stasjon_orig) ~ "OA Økokyst",
+    Stasjonstype = case_when(
+      grepl("Kiel", STATION_NAME) ~ "OA Ferrybox",
+      grepl("Tromsø", STATION_NAME) ~ "OA Ferrybox",
       `Instipro activity` %in% "KYST" ~ "OA Kyst",
+      grepl("VT", STATION_CODE) ~ "OA Økokyst",
+      grepl("VR", STATION_CODE) ~ "OA Økokyst",
       TRUE ~ "OA Kyst")
   )
 
-# oa_stations2 %>% select(Type:`Instipro activity`, Stasjon) %>% View()
+table(oa_stations$Stasjonstype)
+
+# oa_stations %>% select(Type:`Instipro activity`, Stasjonstype) %>% View()
 
 
 
@@ -393,54 +408,123 @@ oa_stations2 <- oa_stations1 %>%
 
 ```{r}
 
-ggplot(oa_stations2, aes(LONGITUDE, LATITUDE, color = Stasjon)) +
+ggplot(oa_stations, aes(LONGITUDE, LATITUDE, color = Stasjonstype)) +
+  geom_point() 
+
+```
+
+
+## Reference rivers    
+
+```{r}
+
+#
+# From Aquamonitor
+#- not used - better to use excel file, which has information (directly) on chemical variables or not
+#
+
+if (FALSE){
+
+  sel <- grepl("referanseelv", df_projects$PROJECT_NAME, ignore.case = TRUE)
+  # sum(sel)
+  df_projects[sel,]
+  
+  df_stations_referanseelv <- get_stations_from_project(
+    "Overvåking av referanseelver", ignore.case = FALSE)  # PROJECT_ID 3320
+  
+}
+
+reference_rivers_1 <- readxl::read_excel("Input_data/Referanseelver_stasjoner_per_2019.xlsx") 
+
+table(addNA(reference_rivers_1$Fortsatt_med))
+table(addNA(reference_rivers_1$Miljøgifter))
+
+reference_rivers <- reference_rivers_1 %>%
+  filter(Fortsatt_med == "ja") %>%
+  rename(
+    LONGITUDE = Lon,
+    LATITUDE = Lat,
+    STATION_CODE = Aquamonitor_stasjonskode) %>%
+  mutate(
+    STATION_NAME = stringr::str_sub(Rapportnavn, start = 5),
+    Stasjonstype = case_when(
+      `Miljøgifter` %in% "X" ~ "Ref. elver (med miljøgifter)",
+      TRUE ~ "Ref. elver (uten miljøgifter)")
+  )
+
+```
+
+
+### Data on map  
+
+```{r}
+
+ggplot(reference_rivers, aes(LONGITUDE, LATITUDE, color = Stasjonstype)) +
   geom_point()
 
 ```
 
 ## Combined ØKOKYST and RID stations   
 
+
+### Combining  
 Makes three sets of coordinates, as there will be made three sets of maps depending on how far same-coordinate stations are moved.
 
 ```{r}
 
 # STATION_NAME first, for hover
-df_comb <- bind_rows(RID_stations %>% 
-                       rename(Stasjon = RID_type) %>%
-                       mutate(LONGITUDE_plot1 = LONGITUDE,
-                              LATITUDE_plot1 = LATITUDE,
-                              LONGITUDE_plot2 = LONGITUDE,
-                              LATITUDE_plot2 = LATITUDE,
-                              LONGITUDE_plot3 = LONGITUDE,
-                              LATITUDE_plot3 = LATITUDE
-                       ) %>%                       
-                       select(STATION_NAME, Stasjon, STATION_CODE, 
-                              LONGITUDE, LATITUDE,
-                              LONGITUDE_plot1, LATITUDE_plot1,
-                              LONGITUDE_plot2, LATITUDE_plot2,
-                              LONGITUDE_plot3, LATITUDE_plot3
-                              ),  
-                     OKOKYST_all_stations2 %>% 
-                       select(STATION_NAME, Stasjon, STATION_CODE, 
-                              LONGITUDE, LATITUDE,
-                              LONGITUDE_plot1, LATITUDE_plot1,
-                              LONGITUDE_plot2, LATITUDE_plot2,
-                              LONGITUDE_plot3, LATITUDE_plot3
-                              )
-)
+df_comb <- bind_rows(
+  RID_stations %>% 
+    rename(Stasjonstype = RID_type) %>%
+    mutate(LONGITUDE_plot1 = LONGITUDE,
+           LATITUDE_plot1 = LATITUDE,
+           LONGITUDE_plot2 = LONGITUDE,
+           LATITUDE_plot2 = LATITUDE,
+           LONGITUDE_plot3 = LONGITUDE,
+           LATITUDE_plot3 = LATITUDE
+    ),  
+  oa_stations %>% 
+    mutate(LONGITUDE_plot1 = LONGITUDE,
+           LATITUDE_plot1 = LATITUDE,
+           LONGITUDE_plot2 = LONGITUDE,
+           LATITUDE_plot2 = LATITUDE,
+           LONGITUDE_plot3 = LONGITUDE,
+           LATITUDE_plot3 = LATITUDE
+    ),  
+  reference_rivers %>% 
+    mutate(LONGITUDE_plot1 = LONGITUDE,
+           LATITUDE_plot1 = LATITUDE,
+           LONGITUDE_plot2 = LONGITUDE,
+           LATITUDE_plot2 = LATITUDE,
+           LONGITUDE_plot3 = LONGITUDE,
+           LATITUDE_plot3 = LATITUDE
+    ),  
+  OKOKYST_all_stations2) %>% 
+  select(STATION_NAME, Stasjonstype, STATION_CODE, 
+         LONGITUDE, LATITUDE,
+         LONGITUDE_plot1, LATITUDE_plot1,
+         LONGITUDE_plot2, LATITUDE_plot2,
+         LONGITUDE_plot3, LATITUDE_plot3
+  )
 
-ggplot(df_comb, aes(LONGITUDE_plot1, LATITUDE_plot1, color = Stasjon)) +
+
+```
+### Test plot  
+```{r}
+
+ggplot(df_comb, aes(LONGITUDE_plot1, LATITUDE_plot1, color = Stasjonstype)) +
   geom_point()
 
 ```
 
-### Make interactive maps
+## Interactive maps, source data  
 
-Makes three sets of data (for the three versions of maps).
+### Makes three sets of data (for the three versions of maps)  
+- With spatial column  
 
 ```{r}
 
-library(nivamaps)
+# library(nivamaps)
 library(sf)
 library(mapview)
 
@@ -479,57 +563,66 @@ label_1 <- with(df_comb1, paste0(STATION_CODE, " (", STATION_NAME, ")"))
 label_2 <- with(df_comb2, paste0(STATION_CODE, " (", STATION_NAME, ")"))
 label_3 <- with(df_comb3, paste0(STATION_CODE, " (", STATION_NAME, ")"))
 
+```
+
+## Interactive maps 1
+
+### Interactive plot (variant 2)  
+
+```{r}
+
 # Plot below
-mapview(df_comb2, zcol = "Stasjon", col.regions = cols, alpha.regions = 1,
+mapview(df_comb2, zcol = "Stasjonstype", col.regions = cols, alpha.regions = 1,
         label = label_2)
+
 
 ```
 
 ### Save interactive maps  
 6 versions:  
-3 versions (depending of movement of same-coordinate stations) * 2 point-size verions
+  - 3 versions (depending of movement of same-coordinate stations) * 2 point-size verions
 
 ```{r}
-# df_comb_data <- df_comb[c("STATION_CODE", "Stasjon")] %>% as.data.frame()
+# df_comb_data <- df_comb[c("STATION_CODE", "Stasjonstype")] %>% as.data.frame()
 
 
-# Static plots
-mapview(df_comb1, zcol = "Stasjon", 
+# Original point size
+mapview(df_comb1, zcol = "Stasjonstype", 
         col.regions = cols, alpha.regions = 1,
         label = label_1
         ) %>%
   mapshot("Figures/01_Rid_and_Okokyst_ver1.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb1, zcol = "Stasjon", 
+mapview(df_comb1, zcol = "Stasjonstype", 
         col.regions = cols, alpha.regions = 1, 
         label = label_1, cex = 3) %>%
   mapshot("Figures/01_Rid_and Okokyst_small_ver1.html")
 
 
 # Static plots
-mapview(df_comb2, zcol = "Stasjon", 
+mapview(df_comb2, zcol = "Stasjonstype", 
         col.regions = cols, alpha.regions = 1,
         label = label_2
         ) %>%
   mapshot("Figures/01_Rid_and_Okokyst_ver2.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb2, zcol = "Stasjon", 
+mapview(df_comb2, zcol = "Stasjonstype", 
         col.regions = cols, alpha.regions = 1, 
         label = label_2, cex = 3) %>%
   mapshot("Figures/01_Rid_and Okokyst_small_ver2.html")
 
 
 # Static plots
-mapview(df_comb3, zcol = "Stasjon", 
+mapview(df_comb3, zcol = "Stasjonstype", 
         col.regions = cols, alpha.regions = 1,
         label = label_3
         ) %>%
   mapshot("Figures/01_Rid_and_Okokyst_ver3.html")
 
 # With smaller dots, for showng all or Norway
-mapview(df_comb3, zcol = "Stasjon", 
+mapview(df_comb3, zcol = "Stasjonstype", 
         col.regions = cols, alpha.regions = 1, 
         label = label_3, cex = 3) %>%
   mapshot("Figures/01_Rid_and Okokyst_small_ver3.html")
@@ -545,5 +638,282 @@ mapview(df_comb3, zcol = "Stasjon",
 
 ```
 
+## Interactive maps 2 (ver 4)   
+- HTML files version 4a and 4b  
+
+### Separate data for each station type     
+```{r}
+
+#
+# Better; Split by first part of 'Stasjonstype' (Bløtbunn, hardbunn etc) => 5 layers  
+#
+
+table(df_comb2$Stasjonstype)  
+
+df_comb2_ver4 <- df_comb2 %>%
+  select(
+    -c(LONGITUDE_plot1, LONGITUDE_plot2, LONGITUDE_plot3, 
+       LATITUDE_plot1, LATITUDE_plot2, LATITUDE_plot3)) %>%
+  mutate(
+    Type = case_when(
+      grepl("Ref. elver", Stasjonstype) ~ "Referanseelver",
+      grepl("OA", Stasjonstype) ~ "Havforsuring",
+      TRUE ~ Stasjonstype %>% stringr::str_extract("[^[[:blank:]]]+")
+      ),
+    Type = case_when(
+      Type %in% c("Bløtbunn", "Hardbunn", "Hydrografi", "Ålegras") ~ paste("Økokyst -", Type), 
+      Type %in% "RID" ~ "RID-elver", 
+      TRUE ~ Type),
+    Type = factor(Type, levels = c("Økokyst - Bløtbunn", "Økokyst - Hardbunn", 
+                                   "Økokyst - Hydrografi", "Økokyst - Ålegras", 
+                                   "Havforsuring", "RID-elver", "Referanseelver")),
+    Label = paste0(STATION_CODE, " (", STATION_NAME, ")")   # for mouseover
+  )
+
+# names(table(df_comb2_ver4$Type)) %>% dput()
+
+# Check
+# df_comb2_ver4 %>% count(Type, Stasjonstype) %>% View()
+table(df_comb2_ver4$Type)  
+# table(df_comb2_ver4$Stasjonstype, df_comb2_ver4$Type)  
+
+#
+# Make list
+#
+df_comb2_ver4_list <- df_comb2_ver4 %>%
+  base::split(df_comb2_ver4$Type)
+
+df_comb2_ver4_list %>% map_int(nrow)
+
+```
+
+### Colors 
+
+```{r}
+
+# Colors
+# RColorBrewer::display.brewer.all()
+
+# Qualitative color schemes by Paul Tol
+#     https://www.r-bloggers.com/the-paul-tol-21-color-salute/
+#     http://www.sron.nl/~pault/colourschemes.pdf
+#     Paul Tol 2012. Colour Schemes. SRON Technical Note SRON/EPS/TN/09-002 (issue 2.2)
+
+if (FALSE){
+  
+# tol15rainbow
+cols <- c("#114477", "#4477AA", "#77AADD", "#117755", "#44AA88", "#99CCBB", "#777711", "#AAAA44", "#DDDD77", "#771111", "#AA4444", "#DD7777", "#771144", "#AA4477", "#DD77AA")
+pie(rep(1,length(cols)), col = cols)
+
+# tol7qualitative
+cols <- c("#332288", "#88CCEE", "#44AA99", "#117733", "#DDCC77", "#CC6677","#AA4499")
+pie(rep(1,length(cols)), col = cols)
+
+# tol10qualitative
+tol10qualitative=c("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77", "#661100", "#CC6677", "#882255", "#AA4499")
+pie(rep(1,length(cols)), col = cols)
+
+}
+
+# tol21rainbow
+# Then just use some of tjem
+cols <-  c("#771155", "#AA4488", "#CC99BB", "#114477", "#4477AA", "#77AADD", "#117777", "#44AAAA", "#77CCCC", "#117744", "#44AA77", "#88CCAA", "#777711", "#AAAA44", "#DDDD77", "#774411", "#AA7744", "#DDAA77", "#771122", "#AA4455", "#DD7788")
+pie(rep(1,length(cols)), col = cols)
+# These two are a bit similar to no. 7 and 8, so we change them manually:
+cols[10] <- "limegreen"
+cols[11] <- "lawngreen"
+pie(rep(1,length(cols)), col = cols)
+
+# NOte: element 5 (IO stations) have 3 levels
+col_list <- list(cols[1:2], cols[4:5], cols[7:8], cols[10:11], cols[13:15], cols[16:17], cols[19:20])
 
 
+```
+
+### Make interactive map a  
+Original point size  
+```{r}
+
+
+map_list <- seq_along(df_comb2_ver4_list) %>%
+  purrr::map(
+    ~mapview(df_comb2_ver4_list[[.x]], 
+             zcol = "Stasjonstype", 
+             col.regions = col_list[[.x]], 
+             alpha.regions = 1,
+             label = df_comb2_ver4_list[[.x]]$Label, 
+             layer.name = names(df_comb2_ver4_list)[.x])
+)
+
+final_map_ver4a <- map_list[[1]]
+for (i in 2:length(map_list))
+  final_map_ver4a <- final_map_ver4a + map_list[[i]]
+
+```
+
+
+
+### Make interactive map b  
+Smaller point size  
+```{r}
+
+map_list <- seq_along(df_comb2_ver4_list) %>%
+  purrr::map(
+    ~mapview(df_comb2_ver4_list[[.x]], 
+             zcol = "Stasjonstype", 
+             col.regions = col_list[[.x]], 
+             alpha.regions = 1,
+             label = df_comb2_ver4_list[[.x]]$Label, 
+             layer.name = names(df_comb2_ver4_list)[.x],
+             cex = 3)
+)
+
+
+final_map_ver4b <- map_list[[1]]
+for (i in 2:length(map_list))
+  final_map_ver4b <- final_map_ver4b + map_list[[i]]
+
+```
+
+
+### Save   
+- Also save do
+```{r} 
+
+fn <- "01_Rid_and_Okokyst_ver4a.html"
+final_map_ver4a %>% mapshot(paste0("Figures/", fn))
+final_map_ver4a %>% mapshot(paste0("K:/Avdeling/214-Oseanografi/DHJ/Data/Maps/Økokyst-kart/", fn))
+
+fn <- "01_Rid_and_Okokyst_ver4b.html"
+final_map_ver4b %>% mapshot(paste0("Figures/", fn))
+final_map_ver4b %>% mapshot(paste0("K:/Avdeling/214-Oseanografi/DHJ/Data/Maps/Økokyst-kart/", fn))
+
+# This doesn't work (we need to do it in windows, as there are a bunch of extra :
+# file.copy(
+#   paste0("Figures/", fn),
+#   paste0("K:/Avdeling/214-Oseanografi/DHJ/Data/Maps/Økokyst-kart/", fn)
+# )
+
+# Note: also put on Google docs
+# 
+
+```
+
+
+## Interactive maps 3 (ver 5)   
+
+- HTML files version 5a and 5b  
+- Økokyst in a single group (Type)   
+- NOTE: mouseover text doesn't fit with station (although variable "Label" is correct.) 
+
+### Separate data    
+- 
+```{r}
+
+#
+# Better; Split by first part of 'Stasjonstype' (Bløtbunn, hardbunn etc) => 5 layers  
+#
+
+table(df_comb2$Stasjonstype)  
+
+df_comb2_ver5 <- df_comb2 %>%
+  mutate(
+    Type = case_when(
+      grepl("Ref. elver", Stasjonstype) ~ "Referanseelver",
+      grepl("OA", Stasjonstype) ~ "Havforsuring",
+      TRUE ~ Stasjonstype %>% stringr::str_extract("[^[[:blank:]]]+")
+      ),
+    Type = case_when(
+      Type %in% c("Bløtbunn", "Hardbunn", "Hydrografi", "Ålegras") ~ "Økokyst",   # CHANGED
+      Type %in% "RID" ~ "RID-elver", 
+      TRUE ~ Type),
+    Type = factor(Type, levels = c("Økokyst",                                     # CHANGED 
+                                   "Havforsuring", "RID-elver", "Referanseelver")),
+    Label = paste0(STATION_CODE, " (", STATION_NAME, ")")   # for mouseover
+  )
+
+# names(table(df_comb2_ver5$Type)) %>% dput()
+
+# Check
+# df_comb2_ver5 %>% count(Type, Stasjonstype) %>% View()
+# table(df_comb2_ver5$Type)  
+# table(df_comb2_ver5$Stasjonstype, df_comb2_ver5$Type)  
+
+#
+# Make list
+#
+df_comb2_ver5_list <- df_comb2_ver5 %>%
+  base::split(df_comb2_ver5$Type)
+
+df_comb2_ver5_list %>% map_int(nrow)
+
+```
+
+
+### Colors 
+
+```{r}
+
+# NOte: element 5 (IO stations) have 3 levels
+col_list_b <- list(cols[c(1:2, 4:5, 7:8, 10:11)], cols[13:15], cols[16:17], cols[19:20])
+
+
+```
+
+### Make interactive map a  
+Original point size  
+```{r}
+
+
+map_list <- seq_along(df_comb2_ver5_list) %>%
+  purrr::map(
+    ~mapview(df_comb2_ver5_list[[.x]], 
+             zcol = "Stasjonstype", 
+             col.regions = col_list_b[[.x]], 
+             alpha.regions = 1,
+             label = df_comb2_ver5_list[[.x]]$Label, 
+             layer.name = names(df_comb2_ver5_list)[.x])
+)
+
+final_map_ver5a <- map_list[[1]]
+for (i in 2:length(map_list))
+  final_map_ver5a <- final_map_ver5a + map_list[[i]]
+
+```
+
+
+
+### Make interactive map b  
+Smaller point size  
+```{r}
+
+map_list <- seq_along(df_comb2_ver5_list) %>%
+  purrr::map(
+    ~mapview(df_comb2_ver5_list[[.x]], 
+             zcol = "Stasjonstype", 
+             col.regions = col_list_b[[.x]], 
+             alpha.regions = 1,
+             label = df_comb2_ver5_list[[.x]]$Label, 
+             layer.name = names(df_comb2_ver5_list)[.x],
+             cex = 3)
+)
+
+final_map_ver5b <- map_list[[1]]
+for (i in 2:length(map_list))
+  final_map_ver5b <- final_map_ver5b + map_list[[i]]
+
+```
+
+
+### Save
+```{r} 
+
+fn <- "01_Rid_and_Okokyst_ver5a.html"
+final_map_ver5a %>% mapshot(paste0("Figures/", fn))
+final_map_ver5a %>% mapshot(paste0("K:/Avdeling/214-Oseanografi/DHJ/Data/Maps/Økokyst-kart/", fn))
+
+fn <- "01_Rid_and_Okokyst_ver5b.html"
+final_map_ver5b %>% mapshot(paste0("Figures/", fn))
+final_map_ver5b %>% mapshot(paste0("K:/Avdeling/214-Oseanografi/DHJ/Data/Maps/Økokyst-kart/", fn))
+
+```
